@@ -14,7 +14,7 @@
     </parent>
 
     <groupId>com.creditcard</groupId>
-    <artifactId>customer-service</artifactId>
+    <artifactId>merchant-service</artifactId>
     <version>1.0.0</version>
 
     <packaging>jar</packaging>
