@@ -43,7 +43,6 @@ public ResponseEntity<CreditCardResponse> issueCard(
             .status(HttpStatus.CREATED)
             .body(savedCard);
 }
-
 // 2. Get credit card by card ID
 @GetMapping("/{cardId}")
 public ResponseEntity<CreditCardResponse> getCardById(

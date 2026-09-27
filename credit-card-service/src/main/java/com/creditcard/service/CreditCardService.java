@@ -11,7 +11,10 @@ import com.creditcard.dto.CreditCardRequest;
 import com.creditcard.dto.CreditCardResponse;
 import com.creditcard.entity.CreditCard;
 import com.creditcard.exception.CreditCardNotFoundException;
+import com.creditcard.exception.CustomerNotFoundException;
 import com.creditcard.repository.CreditCardRepository;
+
+import feign.FeignException;
 
 @Service
 @Transactional
@@ -38,8 +41,11 @@ public CreditCardResponse issueCard(CreditCardRequest request) {
     }
 
     // Validate customer through Customer Service
-    customerServiceClient.checkCustomerExists(request.getCustomerId());
-
+    try {
+        customerServiceClient.checkCustomerExists(request.getCustomerId());
+    } catch (FeignException.NotFound e) {
+        throw new CustomerNotFoundException(request.getCustomerId());
+    }
     // Validate balance equation
     validateBalances(
             request.getCreditLimit(),
@@ -48,7 +54,6 @@ public CreditCardResponse issueCard(CreditCardRequest request) {
     );
 
     CreditCard creditCard = new CreditCard();
-
     creditCard.setCustomerId(request.getCustomerId());
     creditCard.setCardNumber(request.getCardNumber());
     creditCard.setCardType(request.getCardType());
@@ -56,7 +61,9 @@ public CreditCardResponse issueCard(CreditCardRequest request) {
     creditCard.setAvailableCredit(request.getAvailableCredit());
     creditCard.setOutstandingAmount(request.getOutstandingAmount());
     creditCard.setExpiryDate(request.getExpiryDate());
-
+    
+    
+    
     // Database schema has DEFAULT 'ACTIVE'
     if (request.getCardStatus() == null || request.getCardStatus().isBlank()) {
         creditCard.setCardStatus("ACTIVE");
