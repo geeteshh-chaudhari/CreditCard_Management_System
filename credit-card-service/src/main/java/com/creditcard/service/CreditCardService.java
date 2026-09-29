@@ -20,256 +20,235 @@ import feign.FeignException;
 @Transactional
 public class CreditCardService {
 
+	private final CreditCardRepository creditCardRepository;
+	private final CustomerServiceClient customerServiceClient;
 
-private final CreditCardRepository creditCardRepository;
-private final CustomerServiceClient customerServiceClient;
+	public CreditCardService(CreditCardRepository creditCardRepository, CustomerServiceClient customerServiceClient) {
 
-public CreditCardService(
-        CreditCardRepository creditCardRepository,
-        CustomerServiceClient customerServiceClient) {
+		this.creditCardRepository = creditCardRepository;
+		this.customerServiceClient = customerServiceClient;
+	}
 
-    this.creditCardRepository = creditCardRepository;
-    this.customerServiceClient = customerServiceClient;
-}
+	// 1. Issue new credit card
+	public CreditCardResponse issueCard(CreditCardRequest request) {
 
-// 1. Issue a new credit card
-public CreditCardResponse issueCard(CreditCardRequest request) {
+		if (creditCardRepository.existsByCardNumber(request.getCardNumber())) {
 
-    // Check whether the card number already exists
-    if (creditCardRepository.existsByCardNumber(request.getCardNumber())) {
-        throw new IllegalArgumentException("Card number already exists");
-    }
+			throw new IllegalArgumentException("Card number already exists");
+		}
 
-    // Validate customer through Customer Service
-    try {
-        customerServiceClient.checkCustomerExists(request.getCustomerId());
-    } catch (FeignException.NotFound e) {
-        throw new CustomerNotFoundException(request.getCustomerId());
-    }
-    // Validate balance equation
-    validateBalances(
-            request.getCreditLimit(),
-            request.getAvailableCredit(),
-            request.getOutstandingAmount()
-    );
+		// Check whether customer exists
+		customerServiceClient.checkCustomerExists(request.getCustomerId());
 
-    CreditCard creditCard = new CreditCard();
-    creditCard.setCustomerId(request.getCustomerId());
-    creditCard.setCardNumber(request.getCardNumber());
-    creditCard.setCardType(request.getCardType());
-    creditCard.setCreditLimit(request.getCreditLimit());
-    creditCard.setAvailableCredit(request.getAvailableCredit());
-    creditCard.setOutstandingAmount(request.getOutstandingAmount());
-    creditCard.setExpiryDate(request.getExpiryDate());
-    
-    
-    
-    // Database schema has DEFAULT 'ACTIVE'
-    if (request.getCardStatus() == null || request.getCardStatus().isBlank()) {
-        creditCard.setCardStatus("ACTIVE");
-    } else {
-        creditCard.setCardStatus(request.getCardStatus());
-    }
+		validateBalances(request.getCreditLimit(), request.getAvailableCredit(), request.getOutstandingAmount());
 
-    CreditCard savedCard = creditCardRepository.save(creditCard);
+		CreditCard creditCard = new CreditCard();
 
-    return mapToResponse(savedCard);
-}
+		creditCard.setCustomerId(request.getCustomerId());
+		creditCard.setCardNumber(request.getCardNumber());
+		creditCard.setCardType(request.getCardType());
+		creditCard.setCreditLimit(request.getCreditLimit());
+		creditCard.setAvailableCredit(request.getAvailableCredit());
+		creditCard.setOutstandingAmount(request.getOutstandingAmount());
+		creditCard.setExpiryDate(request.getExpiryDate());
+		creditCard.setCardStatus(request.getCardStatus());
 
-// 2. Get credit card by ID
-@Transactional(readOnly = true)
-public CreditCardResponse getCardById(Long cardId) {
+		CreditCard savedCard = creditCardRepository.save(creditCard);
 
-    CreditCard creditCard = creditCardRepository.findById(cardId)
-            .orElseThrow(() ->
-                    new CreditCardNotFoundException(
-                            "Credit card not found with ID: " + cardId));
+		return mapToResponse(savedCard);
+	}
 
-    return mapToResponse(creditCard);
-}
+	// 2. Get card by ID
+	@Transactional(readOnly = true)
+	public CreditCardResponse getCardById(Long cardId) {
 
-// 3. Get credit card by card number
-@Transactional(readOnly = true)
-public CreditCardResponse getCardByCardNumber(String cardNumber) {
+		CreditCard card = getEntityById(cardId);
 
-    CreditCard creditCard = creditCardRepository.findByCardNumber(cardNumber)
-            .orElseThrow(() ->
-                    new CreditCardNotFoundException(
-                            "Credit card not found with number: " + cardNumber));
+		return mapToResponse(card);
+	}
 
-    return mapToResponse(creditCard);
-}
+	// 3. Get card by card number
+	@Transactional(readOnly = true)
+	public CreditCardResponse getCardByCardNumber(String cardNumber) {
 
-// 4. Get all credit cards
-@Transactional(readOnly = true)
-public List<CreditCardResponse> getAllCards() {
+		CreditCard card = creditCardRepository.findByCardNumber(cardNumber)
+				.orElseThrow(() -> new CreditCardNotFoundException("Credit card not found with number: " + cardNumber));
 
-    return creditCardRepository.findAll()
-            .stream()
-            .map(this::mapToResponse)
-            .toList();
-}
+		return mapToResponse(card);
+	}
 
-// 5. Get all cards belonging to a customer
-@Transactional(readOnly = true)
-public List<CreditCardResponse> getCardsByCustomerId(Long customerId) {
+	// 4. Get all cards
+	@Transactional(readOnly = true)
+	public List<CreditCardResponse> getAllCards() {
 
-    return creditCardRepository.findByCustomerId(customerId)
-            .stream()
-            .map(this::mapToResponse)
-            .toList();
-}
+		return creditCardRepository.findAll().stream().map(this::mapToResponse).toList();
+	}
 
-// 6. Update credit card
-public CreditCardResponse updateCard(
-        Long cardId,
-        CreditCardRequest request) {
+	// 5. Get cards belonging to a customer
+	@Transactional(readOnly = true)
+	public List<CreditCardResponse> getCardsByCustomerId(Long customerId) {
 
-    CreditCard existingCard = creditCardRepository.findById(cardId)
-            .orElseThrow(() ->
-                    new CreditCardNotFoundException(
-                            "Credit card not found with ID: " + cardId));
+		return creditCardRepository.findByCustomerId(customerId).stream().map(this::mapToResponse).toList();
+	}
 
-    // Validate customer if customer ID is changed
-    if (!existingCard.getCustomerId().equals(request.getCustomerId())) {
-        customerServiceClient.checkCustomerExists(request.getCustomerId());
-        existingCard.setCustomerId(request.getCustomerId());
-    }
+	// 6. Update card
+	public CreditCardResponse updateCard(Long cardId, CreditCardRequest request) {
 
-    // Card number is kept unchanged because it is the unique card identity.
-    // We therefore intentionally do not update cardNumber here.
+		CreditCard existingCard = getEntityById(cardId);
 
-    validateBalances(
-            request.getCreditLimit(),
-            request.getAvailableCredit(),
-            request.getOutstandingAmount()
-    );
+		if (!existingCard.getCustomerId().equals(request.getCustomerId())) {
 
-    existingCard.setCardType(request.getCardType());
-    existingCard.setCreditLimit(request.getCreditLimit());
-    existingCard.setAvailableCredit(request.getAvailableCredit());
-    existingCard.setOutstandingAmount(request.getOutstandingAmount());
-    existingCard.setExpiryDate(request.getExpiryDate());
+			customerServiceClient.checkCustomerExists(request.getCustomerId());
 
-    if (request.getCardStatus() == null || request.getCardStatus().isBlank()) {
-        existingCard.setCardStatus("ACTIVE");
-    } else {
-        existingCard.setCardStatus(request.getCardStatus());
-    }
+			existingCard.setCustomerId(request.getCustomerId());
+		}
 
-    CreditCard updatedCard = creditCardRepository.save(existingCard);
+		validateBalances(request.getCreditLimit(), request.getAvailableCredit(), request.getOutstandingAmount());
 
-    return mapToResponse(updatedCard);
-}
+		existingCard.setCardType(request.getCardType());
 
-// 7. Block credit card
-public CreditCardResponse blockCard(Long cardId) {
+		existingCard.setCreditLimit(request.getCreditLimit());
 
-    CreditCard card = getEntityById(cardId);
+		existingCard.setAvailableCredit(request.getAvailableCredit());
 
-    card.setCardStatus("BLOCKED");
+		existingCard.setOutstandingAmount(request.getOutstandingAmount());
 
-    return mapToResponse(creditCardRepository.save(card));
-}
+		existingCard.setExpiryDate(request.getExpiryDate());
 
-// 8. Unblock credit card
-public CreditCardResponse unblockCard(Long cardId) {
+		existingCard.setCardStatus(request.getCardStatus());
 
-    CreditCard card = getEntityById(cardId);
+		CreditCard updatedCard = creditCardRepository.save(existingCard);
 
-    // Only BLOCKED cards should normally be unblocked
-    if ("CLOSED".equals(card.getCardStatus())) {
-        throw new IllegalArgumentException(
-                "A CLOSED credit card cannot be unblocked");
-    }
+		return mapToResponse(updatedCard);
+	}
 
-    card.setCardStatus("ACTIVE");
+	// 7. Block card
+	public CreditCardResponse blockCard(Long cardId) {
 
-    return mapToResponse(creditCardRepository.save(card));
-}
+		CreditCard card = getEntityById(cardId);
 
-// 9. Check card status
-@Transactional(readOnly = true)
-public String checkCardStatus(Long cardId) {
+		card.setCardStatus("BLOCKED");
 
-    CreditCard card = getEntityById(cardId);
+		CreditCard updatedCard = creditCardRepository.save(card);
 
-    return card.getCardStatus();
-}
+		return mapToResponse(updatedCard);
+	}
 
-// 10. Check available credit
-@Transactional(readOnly = true)
-public BigDecimal checkAvailableCredit(Long cardId) {
+	// 8. Unblock card
+	public CreditCardResponse unblockCard(Long cardId) {
 
-    CreditCard card = getEntityById(cardId);
+		CreditCard card = getEntityById(cardId);
 
-    return card.getAvailableCredit();
-}
+		if ("CLOSED".equals(card.getCardStatus())) {
 
-// Find entity internally
-private CreditCard getEntityById(Long cardId) {
+			throw new IllegalArgumentException("A CLOSED credit card cannot be unblocked");
+		}
 
-    return creditCardRepository.findById(cardId)
-            .orElseThrow(() ->
-                    new CreditCardNotFoundException(
-                            "Credit card not found with ID: " + cardId));
-}
+		card.setCardStatus("ACTIVE");
 
-// Validate database balance constraint
-private void validateBalances(
-        BigDecimal creditLimit,
-        BigDecimal availableCredit,
-        BigDecimal outstandingAmount) {
+		CreditCard updatedCard = creditCardRepository.save(card);
 
-    if (creditLimit == null
-            || availableCredit == null
-            || outstandingAmount == null) {
+		return mapToResponse(updatedCard);
+	}
 
-        throw new IllegalArgumentException(
-                "Credit limit, available credit, and outstanding amount are required");
-    }
+	// 9. Check card status
+	@Transactional(readOnly = true)
+	public String checkCardStatus(Long cardId) {
 
-    if (creditLimit.compareTo(BigDecimal.ZERO) <= 0) {
-        throw new IllegalArgumentException(
-                "Credit limit must be greater than 0");
-    }
+		CreditCard card = getEntityById(cardId);
 
-    if (availableCredit.compareTo(BigDecimal.ZERO) < 0) {
-        throw new IllegalArgumentException(
-                "Available credit cannot be negative");
-    }
+		return card.getCardStatus();
+	}
 
-    if (outstandingAmount.compareTo(BigDecimal.ZERO) < 0) {
-        throw new IllegalArgumentException(
-                "Outstanding amount cannot be negative");
-    }
+	// 10. Check available credit
+	@Transactional(readOnly = true)
+	public BigDecimal checkAvailableCredit(Long cardId) {
 
-    BigDecimal total = availableCredit.add(outstandingAmount);
+		CreditCard card = getEntityById(cardId);
 
-    if (total.compareTo(creditLimit) != 0) {
-        throw new IllegalArgumentException(
-                "Available credit + outstanding amount must equal credit limit");
-    }
-}
+		return card.getAvailableCredit();
+	}
 
-// Entity -> Response DTO
-private CreditCardResponse mapToResponse(CreditCard creditCard) {
+	// 11. Update available credit and outstanding amount
+	// This will be called by Transaction MS.
+	public CreditCardResponse updateBalance(Long cardId, BigDecimal availableCredit, BigDecimal outstandingAmount) {
 
-    CreditCardResponse response = new CreditCardResponse();
+		CreditCard card = getEntityById(cardId);
 
-    response.setCardId(creditCard.getCardId());
-    response.setCustomerId(creditCard.getCustomerId());
-    response.setCardNumber(creditCard.getCardNumber());
-    response.setCardType(creditCard.getCardType());
-    response.setCreditLimit(creditCard.getCreditLimit());
-    response.setAvailableCredit(creditCard.getAvailableCredit());
-    response.setOutstandingAmount(creditCard.getOutstandingAmount());
-    response.setExpiryDate(creditCard.getExpiryDate());
-    response.setCardStatus(creditCard.getCardStatus());
-    response.setIssuedAt(creditCard.getIssuedAt());
+		validateBalances(card.getCreditLimit(), availableCredit, outstandingAmount);
 
-    return response;
-}
+		card.setAvailableCredit(availableCredit);
+		card.setOutstandingAmount(outstandingAmount);
 
+		CreditCard updatedCard = creditCardRepository.save(card);
 
+		return mapToResponse(updatedCard);
+	}
+
+	// Internal card lookup
+	private CreditCard getEntityById(Long cardId) {
+
+		return creditCardRepository.findById(cardId)
+				.orElseThrow(() -> new CreditCardNotFoundException("Credit card not found with ID: " + cardId));
+	}
+
+	// Validate card balances
+	private void validateBalances(BigDecimal creditLimit, BigDecimal availableCredit, BigDecimal outstandingAmount) {
+
+		if (creditLimit == null || availableCredit == null || outstandingAmount == null) {
+
+			throw new IllegalArgumentException(
+					"Credit limit, available credit, " + "and outstanding amount are required");
+		}
+
+		if (creditLimit.compareTo(BigDecimal.ZERO) <= 0) {
+
+			throw new IllegalArgumentException("Credit limit must be greater than 0");
+		}
+
+		if (availableCredit.compareTo(BigDecimal.ZERO) < 0) {
+
+			throw new IllegalArgumentException("Available credit cannot be negative");
+		}
+
+		if (outstandingAmount.compareTo(BigDecimal.ZERO) < 0) {
+
+			throw new IllegalArgumentException("Outstanding amount cannot be negative");
+		}
+
+		BigDecimal total = availableCredit.add(outstandingAmount);
+
+		if (total.compareTo(creditLimit) != 0) {
+
+			throw new IllegalArgumentException("Available credit + outstanding amount " + "must equal credit limit");
+		}
+	}
+
+	// Entity -> Response DTO
+	private CreditCardResponse mapToResponse(CreditCard creditCard) {
+
+		CreditCardResponse response = new CreditCardResponse();
+
+		response.setCardId(creditCard.getCardId());
+
+		response.setCustomerId(creditCard.getCustomerId());
+
+		response.setCardNumber(creditCard.getCardNumber());
+
+		response.setCardType(creditCard.getCardType());
+
+		response.setCreditLimit(creditCard.getCreditLimit());
+
+		response.setAvailableCredit(creditCard.getAvailableCredit());
+
+		response.setOutstandingAmount(creditCard.getOutstandingAmount());
+
+		response.setExpiryDate(creditCard.getExpiryDate());
+
+		response.setCardStatus(creditCard.getCardStatus());
+
+		response.setIssuedAt(creditCard.getIssuedAt());
+
+		return response;
+	}
 }

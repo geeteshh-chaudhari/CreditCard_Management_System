@@ -1,9 +1,8 @@
 package com.creditcard.controller;
 
-import com.creditcard.dto.MerchantRequest;
-import com.creditcard.entity.Merchant;
-import com.creditcard.service.MerchantService;
-import jakarta.validation.Valid;
+import java.net.URI;
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,8 +14,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.net.URI;
-import java.util.List;
+import com.creditcard.dto.MerchantRequest;
+import com.creditcard.dto.MerchantResponse;
+import com.creditcard.service.MerchantService;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/merchants")
@@ -27,46 +29,68 @@ public class MerchantController {
     public MerchantController(MerchantService merchantService) {
         this.merchantService = merchantService;
     }
-    
 
     @PostMapping
-    public ResponseEntity<Merchant> addMerchant(
-            @Valid @RequestBody MerchantRequest request
-    ) {
-        Merchant created = merchantService.addMerchant(request);
+    public ResponseEntity<MerchantResponse> addMerchant(
+            @Valid @RequestBody MerchantRequest request) {
+
+        MerchantResponse created =
+                merchantService.addMerchant(request);
 
         return ResponseEntity
-                .created(URI.create("/merchants/" + created.getMerchantId()))
+                .created(
+                    URI.create(
+                        "/merchants/" + created.merchantId()
+                    )
+                )
                 .body(created);
     }
 
-    @GetMapping("/{id}")
-    public Merchant getMerchant(@PathVariable Long id) {
-        return merchantService.getMerchant(id);
+    @GetMapping("/{merchantId}")
+    public ResponseEntity<MerchantResponse> getMerchant(
+            @PathVariable Long merchantId) {
+
+        return ResponseEntity.ok(
+                merchantService.getMerchant(merchantId)
+        );
     }
 
     @GetMapping
-    public List<Merchant> getAllMerchants() {
-        return merchantService.getAllMerchants();
+    public ResponseEntity<List<MerchantResponse>> getAllMerchants() {
+
+        return ResponseEntity.ok(
+                merchantService.getAllMerchants()
+        );
     }
 
-    @PutMapping("/{id}")
-    public Merchant updateMerchant(
-            @PathVariable Long id,
-            @Valid @RequestBody MerchantRequest request
-    ) {
-        return merchantService.updateMerchant(id, request);
+    @PutMapping("/{merchantId}")
+    public ResponseEntity<MerchantResponse> updateMerchant(
+            @PathVariable Long merchantId,
+            @Valid @RequestBody MerchantRequest request) {
+
+        return ResponseEntity.ok(
+                merchantService.updateMerchant(
+                        merchantId,
+                        request
+                )
+        );
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteMerchant(@PathVariable Long id) {
-        merchantService.deleteMerchant(id);
+    @DeleteMapping("/{merchantId}")
+    public ResponseEntity<Void> deleteMerchant(
+            @PathVariable Long merchantId) {
+
+        merchantService.deleteMerchant(merchantId);
+
         return ResponseEntity.noContent().build();
     }
 
-    
     @GetMapping("/search")
-    public List<Merchant> searchMerchants(@RequestParam String keyword) {
-        return merchantService.searchMerchants(keyword);
+    public ResponseEntity<List<MerchantResponse>> searchMerchants(
+            @RequestParam String keyword) {
+
+        return ResponseEntity.ok(
+                merchantService.searchMerchants(keyword)
+        );
     }
 }
