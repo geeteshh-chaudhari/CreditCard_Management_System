@@ -29,6 +29,8 @@ public class MerchantController {
     public MerchantController(MerchantService merchantService) {
         this.merchantService = merchantService;
     }
+    
+//    1. Add merchant
 
     @PostMapping
     public ResponseEntity<MerchantResponse> addMerchant(
