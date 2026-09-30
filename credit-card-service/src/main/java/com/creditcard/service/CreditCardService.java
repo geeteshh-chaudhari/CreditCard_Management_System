@@ -11,7 +11,10 @@ import com.creditcard.dto.CreditCardRequest;
 import com.creditcard.dto.CreditCardResponse;
 import com.creditcard.entity.CreditCard;
 import com.creditcard.exception.CreditCardNotFoundException;
+import com.creditcard.exception.CustomerNotFoundException;
 import com.creditcard.repository.CreditCardRepository;
+
+import feign.FeignException;
 
 @Service
 @Transactional

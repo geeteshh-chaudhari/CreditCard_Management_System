@@ -25,4 +25,12 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ex.getMessage());
     }
+    @ExceptionHandler(CustomerNotFoundException.class)
+    public ResponseEntity<String> handleCustomerNotFound(
+            CustomerNotFoundException ex) {
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ex.getMessage());
+    }
 }
