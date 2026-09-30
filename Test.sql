@@ -1,0 +1,9 @@
+select * from customer;
+select * from merchant;
+select * from CREDIT_CARD;
+select * from CARD_TRANSACTION;
+
+-- ALTER TABLE CARD_TRANSACTION
+-- ADD CUSTOMER_ID NUMBER NOT NULL
+--     CONSTRAINT FK_TRANSACTION_CUSTOMER
+--     REFERENCES CUSTOMER(CUSTOMER_ID);
