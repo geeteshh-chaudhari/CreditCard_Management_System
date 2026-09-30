@@ -60,6 +60,7 @@ public class TransactionService {
 			throw new IllegalArgumentException("Card does not belong to customer");
 		}
 
+		
 		// Purchase allowed only on ACTIVE card
 		if (card.getCardStatus() == null || !"ACTIVE".equalsIgnoreCase(card.getCardStatus())) {
 

@@ -18,6 +18,7 @@ public interface CardServiceClient {
     CreditCardResponse getCardById(
             @PathVariable("cardId") Long cardId
     );
+    
 
     @PutMapping("/cards/{cardId}/balance")
     CreditCardResponse updateBalance(
