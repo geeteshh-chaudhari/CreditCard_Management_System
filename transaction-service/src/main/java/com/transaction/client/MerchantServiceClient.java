@@ -6,11 +6,13 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 import com.transaction.dto.MerchantResponse;
 
-@FeignClient(name = "merchant-service")
-public interface MerchantServiceClient {
+@FeignClient(
+	    name = "merchant-service"
+	)
+	public interface MerchantServiceClient {
 
-    @GetMapping("/merchants/{merchantId}")
-    MerchantResponse getMerchantById(
-            @PathVariable("merchantId") Long merchantId
-    );
-}
+	    @GetMapping("/merchants/{merchantId}")
+	    MerchantResponse getMerchantById(
+	            @PathVariable("merchantId") Long merchantId
+	    );
+	}
