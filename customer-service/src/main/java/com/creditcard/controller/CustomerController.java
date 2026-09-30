@@ -57,11 +57,11 @@ public class CustomerController {
 //	5. Delete Customer by ID
 
 	@DeleteMapping("/{customerId}")
-	public ResponseEntity<Void> deleteCustomer(@PathVariable Long customerId) {
+	public ResponseEntity<String> deleteCustomer(@PathVariable Long customerId) {
 
 		customerService.deleteCustomer(customerId);
 
-		return ResponseEntity.noContent().build();
+		return ResponseEntity.ok("Customer deleted successfully");
 	}
 	
 //	6. Search Entire Customer by Name
