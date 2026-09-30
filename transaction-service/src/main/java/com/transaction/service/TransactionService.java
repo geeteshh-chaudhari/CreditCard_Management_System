@@ -24,13 +24,15 @@ public class TransactionService {
 	private final TransactionRepository transactionRepository;
 	private final CardServiceClient cardServiceClient;
 	private final MerchantServiceClient merchantServiceClient;
+	private final TransactionAuditService transactionAuditService;
 
 	public TransactionService(TransactionRepository transactionRepository, CardServiceClient cardServiceClient,
-			MerchantServiceClient merchantServiceClient) {
+			MerchantServiceClient merchantServiceClient, TransactionAuditService transactionAuditService) {
 
 		this.transactionRepository = transactionRepository;
 		this.cardServiceClient = cardServiceClient;
 		this.merchantServiceClient = merchantServiceClient;
+		this.transactionAuditService = transactionAuditService;
 	}
 
 	// 1. Make a purchase
@@ -40,14 +42,13 @@ public class TransactionService {
 
 		// Get credit card
 		try {
-
 			card = cardServiceClient.getCardById(request.getCardId());
 
 		} catch (Exception ex) {
 
 			ex.printStackTrace();
 
-			saveFailedTransaction(request, "Credit card not found: " + ex.getMessage());
+			transactionAuditService.saveFailedTransaction(request, "Credit card not found: " + ex.getMessage());
 
 			throw new IllegalArgumentException("Credit card not found: " + ex.getMessage(), ex);
 		}
@@ -55,16 +56,15 @@ public class TransactionService {
 		// Check whether card belongs to customer
 		if (card.getCustomerId() == null || !card.getCustomerId().equals(request.getCustomerId())) {
 
-			saveFailedTransaction(request, "Card does not belong to customer");
+			transactionAuditService.saveFailedTransaction(request, "Card does not belong to customer");
 
 			throw new IllegalArgumentException("Card does not belong to customer");
 		}
 
-		
 		// Purchase allowed only on ACTIVE card
 		if (card.getCardStatus() == null || !"ACTIVE".equalsIgnoreCase(card.getCardStatus())) {
 
-			saveFailedTransaction(request, "Credit card is not ACTIVE");
+			transactionAuditService.saveFailedTransaction(request, "Credit card is not ACTIVE");
 
 			throw new IllegalArgumentException("Purchases are allowed only on ACTIVE cards");
 		}
@@ -72,7 +72,7 @@ public class TransactionService {
 		// Merchant is required for purchase
 		if (request.getMerchantId() == null) {
 
-			saveFailedTransaction(request, "Merchant ID is required for purchase");
+			transactionAuditService.saveFailedTransaction(request, "Merchant ID is required for purchase");
 
 			throw new IllegalArgumentException("Merchant ID is required for purchase");
 		}
@@ -86,7 +86,7 @@ public class TransactionService {
 
 			ex.printStackTrace();
 
-			saveFailedTransaction(request, "Merchant not found: " + ex.getMessage());
+			transactionAuditService.saveFailedTransaction(request, "Merchant not found: " + ex.getMessage());
 
 			throw new IllegalArgumentException("Merchant not found: " + ex.getMessage(), ex);
 		}
@@ -94,7 +94,7 @@ public class TransactionService {
 		// Check available credit
 		if (card.getAvailableCredit() == null || card.getAvailableCredit().compareTo(request.getAmount()) < 0) {
 
-			saveFailedTransaction(request, "Insufficient available credit");
+			transactionAuditService.saveFailedTransaction(request, "Insufficient available credit");
 
 			throw new InsufficientBalance("Insufficient available credit");
 		}
@@ -113,7 +113,8 @@ public class TransactionService {
 
 			ex.printStackTrace();
 
-			saveFailedTransaction(request, "Unable to update credit card balance: " + ex.getMessage());
+			transactionAuditService.saveFailedTransaction(request,
+					"Unable to update credit card balance: " + ex.getMessage());
 
 			throw new IllegalArgumentException("Unable to update credit card balance: " + ex.getMessage(), ex);
 		}
@@ -140,7 +141,7 @@ public class TransactionService {
 
 			ex.printStackTrace();
 
-			saveFailedTransaction(request, "Credit card not found: " + ex.getMessage());
+			transactionAuditService.saveFailedTransaction(request, "Credit card not found: " + ex.getMessage());
 
 			throw new IllegalArgumentException("Credit card not found: " + ex.getMessage(), ex);
 		}
@@ -148,7 +149,7 @@ public class TransactionService {
 		// Check whether card belongs to customer
 		if (card.getCustomerId() == null || !card.getCustomerId().equals(request.getCustomerId())) {
 
-			saveFailedTransaction(request, "Card does not belong to customer");
+			transactionAuditService.saveFailedTransaction(request, "Card does not belong to customer");
 
 			throw new IllegalArgumentException("Card does not belong to customer");
 		}
@@ -156,7 +157,7 @@ public class TransactionService {
 		// Payment cannot exceed outstanding amount
 		if (request.getAmount().compareTo(card.getOutstandingAmount()) > 0) {
 
-			saveFailedTransaction(request, "Payment amount exceeds outstanding balance");
+			transactionAuditService.saveFailedTransaction(request, "Payment amount exceeds outstanding balance");
 
 			throw new InsufficientBalance("Payment amount cannot exceed outstanding balance");
 		}
@@ -175,7 +176,8 @@ public class TransactionService {
 
 			ex.printStackTrace();
 
-			saveFailedTransaction(request, "Unable to update credit card balance: " + ex.getMessage());
+			transactionAuditService.saveFailedTransaction(request,
+					"Unable to update credit card balance: " + ex.getMessage());
 
 			throw new IllegalArgumentException("Unable to update credit card balance: " + ex.getMessage(), ex);
 		}
@@ -199,7 +201,6 @@ public class TransactionService {
 	}
 
 	// 4. Get complete transaction history
-	// Reports MS can also consume this endpoint.
 	@Transactional(readOnly = true)
 	public List<TransactionResponse> getAllTransactions() {
 
@@ -222,14 +223,6 @@ public class TransactionService {
 		transaction.setFailureReason(failureReason);
 
 		return transaction;
-	}
-
-	// Save failed transaction
-	private void saveFailedTransaction(TransactionRequest request, String failureReason) {
-
-		Transaction transaction = createTransaction(request, request.getTransactionType(), "FAILED", failureReason);
-
-		transactionRepository.save(transaction);
 	}
 
 	// Entity -> Response DTO
