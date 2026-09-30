@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -18,7 +19,7 @@ public interface CardServiceClient {
             @PathVariable("cardId") Long cardId
     );
 
-    @PatchMapping("/cards/{cardId}/balance")
+    @PutMapping("/cards/{cardId}/balance")
     CreditCardResponse updateBalance(
             @PathVariable("cardId") Long cardId,
             @RequestParam("availableCredit") BigDecimal availableCredit,

@@ -38,17 +38,22 @@ public class TransactionService {
 
 		CreditCardResponse card;
 
+		// Get credit card
 		try {
+
 			card = cardServiceClient.getCardById(request.getCardId());
+
 		} catch (Exception ex) {
 
-			saveFailedTransaction(request, "Credit card not found");
+			ex.printStackTrace();
 
-			throw new IllegalArgumentException("Credit card not found");
+			saveFailedTransaction(request, "Credit card not found: " + ex.getMessage());
+
+			throw new IllegalArgumentException("Credit card not found: " + ex.getMessage(), ex);
 		}
 
 		// Check whether card belongs to customer
-		if (!card.getCustomerId().equals(request.getCustomerId())) {
+		if (card.getCustomerId() == null || !card.getCustomerId().equals(request.getCustomerId())) {
 
 			saveFailedTransaction(request, "Card does not belong to customer");
 
@@ -56,7 +61,7 @@ public class TransactionService {
 		}
 
 		// Purchase allowed only on ACTIVE card
-		if (!"ACTIVE".equalsIgnoreCase(card.getCardStatus())) {
+		if (card.getCardStatus() == null || !"ACTIVE".equalsIgnoreCase(card.getCardStatus())) {
 
 			saveFailedTransaction(request, "Credit card is not ACTIVE");
 
@@ -78,19 +83,22 @@ public class TransactionService {
 
 		} catch (Exception ex) {
 
-			saveFailedTransaction(request, "Merchant not found");
+			ex.printStackTrace();
 
-			throw new IllegalArgumentException("Merchant not found");
+			saveFailedTransaction(request, "Merchant not found: " + ex.getMessage());
+
+			throw new IllegalArgumentException("Merchant not found: " + ex.getMessage(), ex);
 		}
 
 		// Check available credit
-		if (card.getAvailableCredit().compareTo(request.getAmount()) < 0) {
+		if (card.getAvailableCredit() == null || card.getAvailableCredit().compareTo(request.getAmount()) < 0) {
 
 			saveFailedTransaction(request, "Insufficient available credit");
 
 			throw new InsufficientBalance("Insufficient available credit");
 		}
 
+		// Calculate new balances
 		BigDecimal newAvailableCredit = card.getAvailableCredit().subtract(request.getAmount());
 
 		BigDecimal newOutstandingAmount = card.getOutstandingAmount().add(request.getAmount());
@@ -102,9 +110,11 @@ public class TransactionService {
 
 		} catch (Exception ex) {
 
-			saveFailedTransaction(request, "Unable to update credit card balance");
+			ex.printStackTrace();
 
-			throw new IllegalArgumentException("Unable to update credit card balance");
+			saveFailedTransaction(request, "Unable to update credit card balance: " + ex.getMessage());
+
+			throw new IllegalArgumentException("Unable to update credit card balance: " + ex.getMessage(), ex);
 		}
 
 		// Record successful purchase
@@ -115,24 +125,27 @@ public class TransactionService {
 		return mapToResponse(savedTransaction);
 	}
 
-	// 2. Make payment
+	// 2. Make a payment
 	public TransactionResponse makePayment(TransactionRequest request) {
 
 		CreditCardResponse card;
 
+		// Get credit card
 		try {
 
 			card = cardServiceClient.getCardById(request.getCardId());
 
 		} catch (Exception ex) {
 
-			saveFailedTransaction(request, "Credit card not found");
+			ex.printStackTrace();
 
-			throw new IllegalArgumentException("Credit card not found");
+			saveFailedTransaction(request, "Credit card not found: " + ex.getMessage());
+
+			throw new IllegalArgumentException("Credit card not found: " + ex.getMessage(), ex);
 		}
 
 		// Check whether card belongs to customer
-		if (!card.getCustomerId().equals(request.getCustomerId())) {
+		if (card.getCustomerId() == null || !card.getCustomerId().equals(request.getCustomerId())) {
 
 			saveFailedTransaction(request, "Card does not belong to customer");
 
@@ -147,20 +160,23 @@ public class TransactionService {
 			throw new InsufficientBalance("Payment amount cannot exceed outstanding balance");
 		}
 
+		// Calculate new balances
 		BigDecimal newOutstandingAmount = card.getOutstandingAmount().subtract(request.getAmount());
 
 		BigDecimal newAvailableCredit = card.getAvailableCredit().add(request.getAmount());
 
-		// Update card balance
+		// Update balance in Credit Card MS
 		try {
 
 			cardServiceClient.updateBalance(card.getCardId(), newAvailableCredit, newOutstandingAmount);
 
 		} catch (Exception ex) {
 
-			saveFailedTransaction(request, "Unable to update credit card balance");
+			ex.printStackTrace();
 
-			throw new IllegalArgumentException("Unable to update credit card balance");
+			saveFailedTransaction(request, "Unable to update credit card balance: " + ex.getMessage());
+
+			throw new IllegalArgumentException("Unable to update credit card balance: " + ex.getMessage(), ex);
 		}
 
 		// Record successful payment
@@ -182,7 +198,7 @@ public class TransactionService {
 	}
 
 	// 4. Get complete transaction history
-	// Reports MS can consume this endpoint.
+	// Reports MS can also consume this endpoint.
 	@Transactional(readOnly = true)
 	public List<TransactionResponse> getAllTransactions() {
 
@@ -196,19 +212,12 @@ public class TransactionService {
 		Transaction transaction = new Transaction();
 
 		transaction.setCardId(request.getCardId());
-
 		transaction.setCustomerId(request.getCustomerId());
-
 		transaction.setMerchantId(request.getMerchantId());
-
 		transaction.setTransactionType(transactionType);
-
 		transaction.setAmount(request.getAmount());
-
 		transaction.setTransactionDate(LocalDateTime.now());
-
 		transaction.setTransactionStatus(transactionStatus);
-
 		transaction.setFailureReason(failureReason);
 
 		return transaction;
@@ -228,21 +237,13 @@ public class TransactionService {
 		TransactionResponse response = new TransactionResponse();
 
 		response.setTransactionId(transaction.getTransactionId());
-
 		response.setCardId(transaction.getCardId());
-
 		response.setCustomerId(transaction.getCustomerId());
-
 		response.setMerchantId(transaction.getMerchantId());
-
 		response.setTransactionType(transaction.getTransactionType());
-
 		response.setAmount(transaction.getAmount());
-
 		response.setTransactionDate(transaction.getTransactionDate());
-
 		response.setTransactionStatus(transaction.getTransactionStatus());
-
 		response.setFailureReason(transaction.getFailureReason());
 
 		return response;

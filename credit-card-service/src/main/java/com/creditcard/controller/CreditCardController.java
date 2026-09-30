@@ -108,9 +108,10 @@ public class CreditCardController {
 
 	// 11. Update available credit and outstanding amount
 	// Used by Transaction MS.
-	@PatchMapping("/{cardId}/balance")
-	public ResponseEntity<CreditCardResponse> updateBalance(@PathVariable Long cardId,
-			@RequestParam BigDecimal availableCredit, @RequestParam BigDecimal outstandingAmount) {
+	@PutMapping("/{cardId}/balance")
+	public ResponseEntity<CreditCardResponse> updateBalance(@PathVariable("cardId") Long cardId,
+			@RequestParam("availableCredit") BigDecimal availableCredit,
+			@RequestParam("outstandingAmount") BigDecimal outstandingAmount) {
 
 		return ResponseEntity.ok(creditCardService.updateBalance(cardId, availableCredit, outstandingAmount));
 	}
